@@ -26,6 +26,7 @@
 #include "omap_device.h"
 #include "omap_hwmod.h"
 #include "soc.h"
+#include "control.h"
 
 /* forward declarations */
 static int omap_rproc_device_enable(struct platform_device *pdev);
@@ -37,7 +38,8 @@ static int omap_rproc_device_shutdown(struct platform_device *pdev);
  * This will go away as soon as we have the IOMMU-based generic
  * DMA API in place.
  */
-#define OMAP_RPROC_CMA_BASE	(0xa9000000)
+#define OMAP_RPROC_CMA_BASE_IPU	(0xa9000000)
+#define OMAP_RPROC_CMA_BASE_DSP	(0xa8800000)
 
 /*
  * These data structures define platform-specific information
@@ -49,6 +51,13 @@ static int omap_rproc_device_shutdown(struct platform_device *pdev);
  */
 static struct omap_rproc_pdata omap4_rproc_data[] = {
 	{
+		.name		= "dsp_c0",
+		.firmware	= "tesla-dsp.xe64T",
+		.mbox_name	= "mbox-dsp",
+		.oh_name	= "dsp",
+		.set_bootaddr	= omap_ctrl_write_dsp_boot_addr,
+	},
+	{
 		.name		= "ipu_c0",
 		.firmware	= "ducati-m3-core0.xem3",
 		.mbox_name	= "mbox-ipu",
@@ -57,15 +66,22 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 };
 
 static struct omap_iommu_arch_data omap4_rproc_iommu[] = {
+	{ .name = "mmu_dsp" },
 	{ .name = "mmu_ipu" },
+};
+
+static struct platform_device omap4_tesla = {
+	.name	= "omap-rproc",
+	.id	= 0,
 };
 
 static struct platform_device omap4_ducati = {
 	.name	= "omap-rproc",
-	.id	= 1, /* reserve 0 for tesla. we respect. */
+	.id	= 1,
 };
 
 static struct platform_device *omap4_rproc_devs[] __initdata = {
+	&omap4_tesla,
 	&omap4_ducati,
 };
 
@@ -78,7 +94,9 @@ static int omap_rproc_device_shutdown(struct platform_device *pdev)
 		return ret;
 
 	/* assert the resets for the processors */
-	if (!strcmp(dev_name(&pdev->dev), "omap-rproc.1")) {
+	if (!strcmp(dev_name(&pdev->dev), "omap-rproc.0"))
+		ret = omap_device_assert_hardreset(pdev, "dsp");
+	else if (!strcmp(dev_name(&pdev->dev), "omap-rproc.1")) {
 		ret = omap_device_assert_hardreset(pdev, "cpu0");
 		if (ret)
 			return ret;
@@ -97,7 +115,11 @@ static int omap_rproc_device_enable(struct platform_device *pdev)
 	int ret = -EINVAL;
 
 	/* release the resets for the processors */
-	if (!strcmp(dev_name(&pdev->dev), "omap-rproc.1")) {
+	if (!strcmp(dev_name(&pdev->dev), "omap-rproc.0")) {
+		ret = omap_device_deassert_hardreset(pdev, "dsp");
+		if (ret)
+			goto out;
+	} else if (!strcmp(dev_name(&pdev->dev), "omap-rproc.1")) {
 		ret = omap_device_deassert_hardreset(pdev, "cpu1");
 		if (ret)
 			goto out;
@@ -120,12 +142,19 @@ void __init omap_rproc_reserve_cma(void)
 {
 	int ret;
 
+	/* reserve CMA memory for OMAP4's dsp "tesla" remote processor */
+	ret = dma_declare_contiguous(&omap4_tesla.dev,
+					CONFIG_OMAP_TESLA_CMA_SIZE,
+					OMAP_RPROC_CMA_BASE_DSP , 0);
+	if (ret)
+		pr_err("dma_declare_contiguous failed for dsp %d\n", ret);
+
 	/* reserve CMA memory for OMAP4's M3 "ducati" remote processor */
 	ret = dma_declare_contiguous(&omap4_ducati.dev,
 					CONFIG_OMAP_DUCATI_CMA_SIZE,
-					OMAP_RPROC_CMA_BASE, 0);
+					OMAP_RPROC_CMA_BASE_IPU, 0);
 	if (ret)
-		pr_err("dma_declare_contiguous failed %d\n", ret);
+		pr_err("dma_declare_contiguous failed for ipu %d\n", ret);
 }
 
 static int __init omap_rproc_init(void)
