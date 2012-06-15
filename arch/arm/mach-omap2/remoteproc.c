@@ -27,6 +27,10 @@
 #include "omap_hwmod.h"
 #include "soc.h"
 
+/* forward declarations */
+static int omap_rproc_device_enable(struct platform_device *pdev);
+static int omap_rproc_device_shutdown(struct platform_device *pdev);
+
 /*
  * Temporarily define the CMA base address explicitly.
  *
@@ -72,6 +76,53 @@ static struct platform_device omap4_ducati = {
 static struct platform_device *omap4_rproc_devs[] __initdata = {
 	&omap4_ducati,
 };
+
+static int omap_rproc_device_shutdown(struct platform_device *pdev)
+{
+	int ret = -EINVAL;
+
+	ret = omap_device_shutdown(pdev);
+	if (ret)
+		return ret;
+
+	/* assert the resets for the processors */
+	if (!strcmp(dev_name(&pdev->dev), "omap-rproc.1")) {
+		ret = omap_device_assert_hardreset(pdev, "cpu0");
+		if (ret)
+			return ret;
+
+		ret = omap_device_assert_hardreset(pdev, "cpu1");
+		if (ret)
+			return ret;
+	} else
+		pr_err("unsupported remoteproc\n");
+
+	return ret;
+}
+
+static int omap_rproc_device_enable(struct platform_device *pdev)
+{
+	int ret = -EINVAL;
+
+	/* release the resets for the processors */
+	if (!strcmp(dev_name(&pdev->dev), "omap-rproc.1")) {
+		ret = omap_device_deassert_hardreset(pdev, "cpu1");
+		if (ret)
+			goto out;
+
+		ret = omap_device_deassert_hardreset(pdev, "cpu0");
+		if (ret)
+			goto out;
+	} else {
+		pr_err("unsupported remoteproc\n");
+		goto out;
+	}
+
+	ret = omap_device_enable(pdev);
+
+out:
+	return ret;
+}
 
 void __init omap_rproc_reserve_cma(void)
 {
@@ -123,8 +174,8 @@ static int __init omap_rproc_init(void)
 			oh_count++;
 		}
 
-		omap4_rproc_data[i].device_enable = omap_device_enable;
-		omap4_rproc_data[i].device_shutdown = omap_device_shutdown;
+		omap4_rproc_data[i].device_enable = omap_rproc_device_enable;
+		omap4_rproc_data[i].device_shutdown = omap_rproc_device_shutdown;
 
 		device_initialize(&pdev->dev);
 
