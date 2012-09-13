@@ -50,6 +50,7 @@ static int omap_rproc_device_shutdown(struct platform_device *pdev);
  * DSP ("Tesla").
  */
 static struct omap_rproc_pdata omap4_rproc_data[] = {
+#ifdef CONFIG_OMAP_REMOTEPROC_DSP
 	{
 		.name		= "dsp_c0",
 		.firmware	= "tesla-dsp.xe64T",
@@ -57,32 +58,46 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.oh_name	= "dsp",
 		.set_bootaddr	= omap_ctrl_write_dsp_boot_addr,
 	},
+#endif
+#ifdef CONFIG_OMAP_REMOTEPROC_IPU
 	{
 		.name		= "ipu_c0",
 		.firmware	= "ducati-m3-core0.xem3",
 		.mbox_name	= "mbox-ipu",
 		.oh_name	= "ipu",
 	},
+#endif
 };
 
 static struct omap_iommu_arch_data omap4_rproc_iommu[] = {
+#ifdef CONFIG_OMAP_REMOTEPROC_DSP
 	{ .name = "mmu_dsp" },
+#endif
+#ifdef CONFIG_OMAP_REMOTEPROC_IPU
 	{ .name = "mmu_ipu" },
+#endif
 };
 
+#ifdef CONFIG_OMAP_REMOTEPROC_DSP
 static struct platform_device omap4_tesla = {
 	.name	= "omap-rproc",
 	.id	= 0,
 };
-
+#endif
+#ifdef CONFIG_OMAP_REMOTEPROC_IPU
 static struct platform_device omap4_ducati = {
 	.name	= "omap-rproc",
 	.id	= 1,
 };
+#endif
 
 static struct platform_device *omap4_rproc_devs[] __initdata = {
+#ifdef CONFIG_OMAP_REMOTEPROC_DSP
 	&omap4_tesla,
+#endif
+#ifdef CONFIG_OMAP_REMOTEPROC_IPU
 	&omap4_ducati,
+#endif
 };
 
 static int omap_rproc_device_shutdown(struct platform_device *pdev)
@@ -140,21 +155,26 @@ out:
 
 void __init omap_rproc_reserve_cma(void)
 {
-	int ret;
-
+#ifdef CONFIG_OMAP_REMOTEPROC_DSP
+	{
 	/* reserve CMA memory for OMAP4's dsp "tesla" remote processor */
-	ret = dma_declare_contiguous(&omap4_tesla.dev,
+	int ret = dma_declare_contiguous(&omap4_tesla.dev,
 					CONFIG_OMAP_TESLA_CMA_SIZE,
 					OMAP_RPROC_CMA_BASE_DSP , 0);
 	if (ret)
 		pr_err("dma_declare_contiguous failed for dsp %d\n", ret);
-
+	}
+#endif
+#ifdef CONFIG_OMAP_REMOTEPROC_IPU
+	{
 	/* reserve CMA memory for OMAP4's M3 "ducati" remote processor */
-	ret = dma_declare_contiguous(&omap4_ducati.dev,
+	int ret = dma_declare_contiguous(&omap4_ducati.dev,
 					CONFIG_OMAP_DUCATI_CMA_SIZE,
 					OMAP_RPROC_CMA_BASE_IPU, 0);
 	if (ret)
 		pr_err("dma_declare_contiguous failed for ipu %d\n", ret);
+	}
+#endif
 }
 
 static int __init omap_rproc_init(void)
