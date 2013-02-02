@@ -534,7 +534,7 @@ static int rproc_handle_devmem(struct rproc *rproc, struct fw_rsc_devmem *rsc,
 	/* make sure reserved bytes are zeroes */
 	if (rsc->reserved) {
 		dev_err(dev, "devmem rsc has non zero reserved bytes\n");
-		return -EINVAL;
+		//return -EINVAL;
 	}
 
 	mapping = kzalloc(sizeof(*mapping), GFP_KERNEL);
@@ -608,7 +608,7 @@ static int rproc_handle_carveout(struct rproc *rproc,
 	/* make sure reserved bytes are zeroes */
 	if (rsc->reserved) {
 		dev_err(dev, "carveout rsc has non zero reserved bytes\n");
-		return -EINVAL;
+		//return -EINVAL;
 	}
 
 	dev_dbg(dev, "carveout rsc: da %x, pa %x, len %x, flags %x\n",
