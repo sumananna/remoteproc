@@ -20,8 +20,11 @@
 #include <linux/remoteproc.h>
 #include <linux/dma-contiguous.h>
 #include <linux/dma-mapping.h>
+#include <linux/of.h>
 #include <linux/platform_data/remoteproc-omap.h>
 #include <linux/platform_data/iommu-omap.h>
+
+#include <plat/dmtimer.h>
 
 #include "omap_device.h"
 #include "omap_hwmod.h"
@@ -42,6 +45,25 @@ static int omap_rproc_device_shutdown(struct platform_device *pdev);
 #define OMAP_RPROC_CMA_BASE_DSP	(0x98800000)
 
 /*
+ * The order of the timers here should exactly be
+ * given in the order we expect a remoteproc dmtimer
+ * will be used in terms of capabilities. The current
+ * DT doesn't support requesting by id, so the .id
+ * field will be made obsolete.
+ */
+#ifdef CONFIG_OMAP_REMOTEPROC_IPU
+static struct omap_rproc_timers_info ipu_timers[] = {
+	{ .cap = OMAP_TIMER_HAS_IPU_IRQ, .id = 3, },
+};
+#endif
+
+#ifdef CONFIG_OMAP_REMOTEPROC_DSP
+static struct omap_rproc_timers_info dsp_timers[] = {
+	{ .cap = OMAP_TIMER_HAS_DSP_IRQ, .id = 5, },
+};
+#endif
+
+/*
  * These data structures define platform-specific information
  * needed for each supported remote processor.
  *
@@ -56,6 +78,8 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.firmware	= "tesla-dsp.xe64T",
 		.mbox_name	= "mbox-dsp",
 		.oh_name	= "dsp",
+		.timers		= dsp_timers,
+		.timers_cnt	= ARRAY_SIZE(dsp_timers),
 		.set_bootaddr	= omap_ctrl_write_dsp_boot_addr,
 	},
 #endif
@@ -65,6 +89,8 @@ static struct omap_rproc_pdata omap4_rproc_data[] = {
 		.firmware	= "ducati-m3-core0.xem3",
 		.mbox_name	= "mbox-ipu",
 		.oh_name	= "ipu",
+		.timers		= ipu_timers,
+		.timers_cnt	= ARRAY_SIZE(ipu_timers),
 	},
 #endif
 };
@@ -153,6 +179,75 @@ out:
 	return ret;
 }
 
+static int omap_rproc_enable_timers(struct platform_device *pdev, bool configure)
+{
+	int i;
+	int ret = 0;
+	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+	struct omap_rproc_timers_info *timers = pdata->timers;
+
+	if (!timers)
+		return -EINVAL;
+
+	if (configure) {
+		for (i = 0; i < pdata->timers_cnt; i++) {
+			/*
+			 * The omap_dm_timer_request_specific will be made
+			 * obsolete eventually, and the design needs to rely
+			 * on dmtimer DT specific api. The current logic is
+			 * flawed and does not meet the needs of remoteproc as
+			 * it requests the timers by capabilities. This needs
+			 * that the timer data be written with an intrinsic
+			 * knowledge of timer capabilities w.r.t the exact
+			 * timer that we need.
+			 */
+			if (of_have_populated_dt())
+				timers[i].odt =
+				    omap_dm_timer_request_by_cap(timers[i].cap);
+			else
+				timers[i].odt =
+				    omap_dm_timer_request_specific(timers[i].id);
+			if (!timers[i].odt) {
+				ret = -EBUSY;
+				dev_err(&pdev->dev,
+					"request for timer %d failed: %d\n",
+							timers[i].id, ret);
+				goto free_timers;
+			}
+			omap_dm_timer_set_source(timers[i].odt, OMAP_TIMER_SRC_SYS_CLK);
+		}
+	}
+
+	for (i = 0; i < pdata->timers_cnt; i++)
+		omap_dm_timer_start(timers[i].odt);
+	return 0;
+
+free_timers:
+	while (i--) {
+		omap_dm_timer_free(timers[i].odt);
+		timers[i].odt = NULL;
+	}
+
+	return ret;
+}
+
+static int omap_rproc_disable_timers(struct platform_device *pdev, bool configure)
+{
+	int i;
+	struct omap_rproc_pdata *pdata = pdev->dev.platform_data;
+	struct omap_rproc_timers_info *timers = pdata->timers;
+
+	for (i = 0; i < pdata->timers_cnt; i++) {
+		omap_dm_timer_stop(timers[i].odt);
+		if (configure) {
+			omap_dm_timer_free(timers[i].odt);
+			timers[i].odt = NULL;
+		}
+	}
+
+	return 0;
+}
+
 void __init omap_rproc_reserve_cma(void)
 {
 #ifdef CONFIG_OMAP_REMOTEPROC_DSP
@@ -217,6 +312,8 @@ static int __init omap_rproc_init(void)
 
 		omap4_rproc_data[i].device_enable = omap_rproc_device_enable;
 		omap4_rproc_data[i].device_shutdown = omap_rproc_device_shutdown;
+		omap4_rproc_data[i].enable_timers = omap_rproc_enable_timers;
+		omap4_rproc_data[i].disable_timers = omap_rproc_disable_timers;
 
 		device_initialize(&pdev->dev);
 
