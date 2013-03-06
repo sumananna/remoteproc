@@ -60,14 +60,6 @@ static struct omap_iommu_arch_data omap4_rproc_iommu[] = {
 	{ .name = "mmu_ipu" },
 };
 
-static struct omap_device_pm_latency omap_rproc_latency[] = {
-	{
-		.deactivate_func = omap_device_idle_hwmods,
-		.activate_func = omap_device_enable_hwmods,
-		.flags = OMAP_DEVICE_LATENCY_AUTO_ADJUST,
-	},
-};
-
 static struct platform_device omap4_ducati = {
 	.name	= "omap-rproc",
 	.id	= 1, /* reserve 0 for tesla. we respect. */
@@ -81,7 +73,7 @@ static int omap_rproc_device_shutdown(struct platform_device *pdev)
 {
 	int ret = -EINVAL;
 
-	ret = omap_device_shutdown(pdev);
+	ret = omap_device_idle(pdev);
 	if (ret)
 		return ret;
 
@@ -182,9 +174,7 @@ static int __init omap_rproc_init(void)
 		/* Set dev_name early to allow dev_xxx in omap_device_alloc */
 		dev_set_name(&pdev->dev, "%s.%d", pdev->name,  pdev->id);
 
-		od = omap_device_alloc(pdev, oh, oh_count,
-					omap_rproc_latency,
-					ARRAY_SIZE(omap_rproc_latency));
+		od = omap_device_alloc(pdev, oh, oh_count);
 		if (!od) {
 			dev_err(&pdev->dev, "omap_device_alloc failed\n");
 			put_device(&pdev->dev);
