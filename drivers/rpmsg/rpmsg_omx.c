@@ -398,11 +398,6 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 	int ret, major, minor;
 	struct rpmsg_omx_service *omxserv;
 
-	if (!idr_pre_get(&rpmsg_omx_services, GFP_KERNEL)) {
-		dev_err(&rpdev->dev, "idr_pre_get failes\n");
-		return -ENOMEM;
-	}
-
 	omxserv = kzalloc(sizeof(*omxserv), GFP_KERNEL);
 	if (!omxserv) {
 		dev_err(&rpdev->dev, "kzalloc failed\n");
@@ -411,10 +406,10 @@ static int rpmsg_omx_probe(struct rpmsg_channel *rpdev)
 
 	/* dynamically assign a new minor number */
 	spin_lock(&rpmsg_omx_services_lock);
-	ret = idr_get_new(&rpmsg_omx_services, omxserv, &minor);
+	minor = idr_alloc(&rpmsg_omx_services, omxserv, 0, 0, GFP_KERNEL);
 	spin_unlock(&rpmsg_omx_services_lock);
-
-	if (ret) {
+	if (minor < 0) {
+		ret = minor;
 		dev_err(&rpdev->dev, "failed to idr_get_new: %d\n", ret);
 		goto free_omx;
 	}
