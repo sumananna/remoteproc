@@ -2635,6 +2635,16 @@ static struct omap_timer_capability_dev_attr capability_dsp_pwm_dev_attr = {
 	.timer_capability       = OMAP_TIMER_HAS_DSP_IRQ | OMAP_TIMER_HAS_PWM,
 };
 
+/* timers with IPU interrupt dev attribute */
+static struct omap_timer_capability_dev_attr capability_ipu_dev_attr = {
+	.timer_capability       = OMAP_TIMER_HAS_IPU_IRQ,
+};
+
+/* pwm timers with IPU interrupt dev attribute */
+static struct omap_timer_capability_dev_attr capability_ipu_pwm_dev_attr = {
+	.timer_capability       = OMAP_TIMER_HAS_IPU_IRQ | OMAP_TIMER_HAS_PWM,
+};
+
 /* timer1 */
 static struct omap_hwmod omap44xx_timer1_hwmod = {
 	.name		= "timer1",
@@ -2681,6 +2691,7 @@ static struct omap_hwmod omap44xx_timer3_hwmod = {
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
+	.dev_attr	= &capability_ipu_dev_attr,
 };
 
 /* timer4 */
@@ -2696,6 +2707,7 @@ static struct omap_hwmod omap44xx_timer4_hwmod = {
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
+	.dev_attr	= &capability_ipu_dev_attr,
 };
 
 /* timer5 */
@@ -2775,7 +2787,7 @@ static struct omap_hwmod omap44xx_timer9_hwmod = {
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
-	.dev_attr	= &capability_pwm_dev_attr,
+	.dev_attr	= &capability_ipu_pwm_dev_attr,
 };
 
 /* timer10 */
@@ -2808,7 +2820,7 @@ static struct omap_hwmod omap44xx_timer11_hwmod = {
 			.modulemode   = MODULEMODE_SWCTRL,
 		},
 	},
-	.dev_attr	= &capability_pwm_dev_attr,
+	.dev_attr	= &capability_ipu_pwm_dev_attr,
 };
 
 /*
