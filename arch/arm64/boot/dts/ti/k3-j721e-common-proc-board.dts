@@ -322,6 +322,10 @@
 	mboxes = <&mailbox0_cluster3 &mbox_c66_1>;
 };
 
+&c71_0 {
+	mboxes = <&mailbox0_cluster4 &mbox_c71_0>;
+};
+
 &main_sdhci0 {
 	/* eMMC */
 	non-removable;
