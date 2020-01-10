@@ -194,7 +194,7 @@
 
 	mcu_r5fss0: r5fss@41000000 {
 		compatible = "ti,am654-r5fss";
-		lockstep-mode = <1>;
+		lockstep-mode = <0>;
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges = <0x41000000 0x00 0x41000000 0x20000>,
