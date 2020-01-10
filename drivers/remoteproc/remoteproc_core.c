@@ -395,6 +395,9 @@ rproc_parse_vring(struct rproc_vdev *rvdev, struct fw_rsc_vdev *rsc, int i)
 		return -EINVAL;
 	}
 
+	vring->da = FW_RSC_ADDR_ANY;
+	dev_dbg(dev, "vdev rsc: forced da to 0x%x\n", vring->da);
+
 	rvring->len = vring->num;
 	rvring->align = vring->align;
 	rvring->rvdev = rvdev;
