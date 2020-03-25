@@ -27,9 +27,12 @@ description: |
 
 properties:
   compatible:
-    const: ti,j721e-c66-dsp
+    enum:
+      - ti,j721e-c66-dsp
+      - ti,j721e-c71-dsp
     description:
       Use "ti,j721e-c66-dsp" for C66x DSPs on K3 J721E SoCs
+      Use "ti,j721e-c71-dsp" for C71x DSPs on K3 J721E SoCs
 
   reg:
     description: |
@@ -37,18 +40,11 @@ properties:
       Each entry should have the memory region's start address
       and the size of the region, the representation matching
       the parent node's '#address-cells' and '#size-cells' values.
-    minItems: 3
-    maxItems: 3
 
   reg-names:
     description: |
       Should contain strings with the names of the specific internal
       internal memory regions, and should be defined in this order
-    maxItems: 3
-    items:
-      - const: l2sram
-      - const: l1pram
-      - const: l1dram
 
   ti,sci:
     $ref: /schemas/types.yaml#/definitions/phandle
@@ -117,6 +113,41 @@ properties:
       should be defined as per the generic bindings in,
       Documentation/devicetree/bindings/sram/sram.yaml
 
+if:
+  properties:
+    compatible:
+      enum:
+        - ti,j721e-c66-dsp
+then:
+  properties:
+    reg:
+      minItems: 3
+      maxItems: 3
+    reg-names:
+      minItems: 3
+      maxItems: 3
+      items:
+        - const: l2sram
+        - const: l1pram
+        - const: l1dram
+else:
+  if:
+    properties:
+      compatible:
+        enum:
+          - ti,j721e-c71-dsp
+  then:
+    properties:
+      reg:
+        minItems: 2
+        maxItems: 2
+      reg-names:
+        minItems: 2
+        maxItems: 2
+        items:
+          - const: l2sram
+          - const: l1dram
+
 required:
  - compatible
  - reg
@@ -152,13 +183,26 @@ examples:
             reg = <0x00 0xa6100000 0x00 0xf00000>;
             no-map;
         };
+
+        c71_0_dma_memory_region: c71-dma-memory@a8000000 {
+            compatible = "shared-dma-pool";
+            reg = <0x00 0xa8000000 0x00 0x100000>;
+            no-map;
+        };
+
+        c71_0_memory_region: c71-memory@a8100000 {
+            compatible = "shared-dma-pool";
+            reg = <0x00 0xa8100000 0x00 0xf00000>;
+            no-map;
+        };
     };
 
     cbass_main: interconnect@100000 {
         compatible = "simple-bus";
         #address-cells = <2>;
         #size-cells = <2>;
-        ranges = <0x4d 0x80800000 0x4d 0x80800000 0x00 0x00800000>, /* C66_0 */
+        ranges = <0x00 0x64800000 0x00 0x64800000 0x00 0x00800000>, /* C71_0 */
+                 <0x4d 0x80800000 0x4d 0x80800000 0x00 0x00800000>, /* C66_0 */
                  <0x4d 0x81800000 0x4d 0x81800000 0x00 0x00800000>; /* C66_1 */
 
         /* J721E C66_0 DSP node */
@@ -176,5 +220,21 @@ examples:
             memory-region = <&c66_0_dma_memory_region>,
                             <&c66_0_memory_region>;
             mboxes = <&mailbox0_cluster3 &mbox_c66_0>;
+        };
+
+        /* J721E C71_0 DSP node */
+        c71_0: dsp@64800000 {
+            compatible = "ti,j721e-c71-dsp";
+            reg = <0x00 0x64800000 0x00 0x00080000>,
+                  <0x00 0x64e00000 0x00 0x0000c000>;
+            reg-names = "l2sram", "l1dram";
+            ti,sci = <&dmsc>;
+            ti,sci-dev-id = <15>;
+            ti,sci-proc-ids = <0x30 0xFF>;
+            resets = <&k3_reset 15 1>;
+            firmware-name = "j7-c71_0-fw";
+            memory-region = <&c71_0_dma_memory_region>,
+                            <&c71_0_memory_region>;
+            mboxes = <&mailbox0_cluster4 &mbox_c71_0>;
         };
     };
