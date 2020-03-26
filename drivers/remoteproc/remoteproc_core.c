@@ -2031,6 +2031,7 @@ static void rproc_type_release(struct device *dev)
 
 	kfree(rproc->firmware);
 	kfree(rproc->ops);
+	kfree_const(rproc->name);
 	kfree(rproc);
 }
 
@@ -2068,6 +2069,7 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 {
 	struct rproc *rproc;
 	char *p, *template = "rproc-%s-fw";
+	const char *rname;
 	int name_len;
 
 	if (!dev || !name || !ops)
@@ -2089,21 +2091,29 @@ struct rproc *rproc_alloc(struct device *dev, const char *name,
 			return NULL;
 	}
 
+	rname = kstrdup_const(name, GFP_KERNEL);
+	if (!rname) {
+		kfree(p);
+		return NULL;
+	}
+
 	rproc = kzalloc(sizeof(struct rproc) + len, GFP_KERNEL);
 	if (!rproc) {
 		kfree(p);
+		kfree_const(rname);
 		return NULL;
 	}
 
 	rproc->ops = kmemdup(ops, sizeof(*ops), GFP_KERNEL);
 	if (!rproc->ops) {
 		kfree(p);
+		kfree_const(rname);
 		kfree(rproc);
 		return NULL;
 	}
 
 	rproc->firmware = p;
-	rproc->name = name;
+	rproc->name = rname;
 	rproc->priv = &rproc[1];
 	rproc->auto_boot = true;
 	rproc->elf_class = ELFCLASS32;
